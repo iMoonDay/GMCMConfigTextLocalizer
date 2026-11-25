@@ -1,0 +1,17 @@
+{
+  "16-Byte Co-op Bitmask Micro-Delta": "16 字节联机位掩码增量同步",
+  "Allocation-free LRU cache for character kerning and line-break measurements.": "使用不分配内存的 LRU 缓存，保存字距和换行测量结果。",
+  "Cutscene Anti-Stuck Watchdog": "过场动画卡住检测",
+  "Dialogue Glyph & SpriteText Cache": "对话字形与 SpriteText 缓存",
+  "Encodes machine and chest states into compact 16-byte CPU cache-line packets with delta suppression.": "将机器和箱子的状态编码为适合 CPU 缓存的 16 字节数据包，并抑制重复的增量数据。",
+  "Event Precondition Fast-Filter": "事件触发条件快速筛选",
+  "Location Spatial Grid (16x16 Chunks)": "地图空间网格（16×16 格区块）",
+  "Machine Audio Polyphony Limiter": "同类机器音效并发限制",
+  "Monitors scripted cutscene actors and teleports stuck characters to destination after 3.5s.": "监测按脚本移动的过场角色，角色卡住 3.5 秒后会被传送到目的地。",
+  "NPC Gift Taste Fast-Lookup Hash": "NPC 礼物喜好哈希查询",
+  "Next-gen spatial grid partitioning farmland into 16x16 chunks with 64-bit SoilBitmask.": "将农田划分为 16×16 格的区块，并使用 64 位 SoilBitmask 记录土壤状态。",
+  "O(1) allocation-free cache resolving NPC gift tastes in sub-2ns.": "使用不分配内存的 O(1) 缓存，在不到 2 纳秒内查询 NPC 的礼物喜好。",
+  "Pre-compiles environmental preconditions (Time, Season, Weather, Year, Day) to eliminate map-entry stutters.": "预编译时间、季节、天气、年份和日期等环境条件，减少进入地图时的卡顿。",
+  "Restricts identical machine sound cues to the closest 3 instances per 100ms window.": "每 100 毫秒内，同一种机器音效只播放距离最近的 3 个。",
+  "💡 เลือก 1-Click Profile ด้านบนเพื่อความลื่นไหลสูงสุดอัตโนมัติ หรือคลิกลิงก์หมวดหมู่ด้านล่างเพื่อปรับแต่งรายตัว:": "💡 选择上方的一键预设可自动获得最佳流畅度，也可以点击下方的分类链接逐项调整。"
+}

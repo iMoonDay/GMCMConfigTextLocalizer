@@ -1,0 +1,4 @@
+{
+  "Toggle lookup on double click": "双击切换查询界面",
+  "Whether to toggle the lookup UI by clicking the left mouse button twice. This looks up the tapped position if possible.": "是否双击鼠标左键来切换查询界面。可查询时会显示点击位置的内容。"
+}

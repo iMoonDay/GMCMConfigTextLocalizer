@@ -1,0 +1,8 @@
+{
+  "Automatic Window Resize Delay": "自动调整窗口的延迟",
+  "Delay in seconds before the game window is resized upon game launch (Short delays may cause issues on slower PCs)": "游戏启动后，等待多少秒再调整窗口大小。延迟太短可能导致性能较低的电脑出现问题。",
+  "Enable Automatic Window Resize": "启用自动调整窗口大小",
+  "If enabled, the game window will resize automatically when the game launches (Enabled by default)": "启用后，游戏启动时会自动调整窗口大小。默认开启。",
+  "Manual Window Resize Keybind": "手动调整窗口快捷键",
+  "Press this key to manually enter a borderless windowed mode": "按此键手动切换到无边框窗口模式。"
+}

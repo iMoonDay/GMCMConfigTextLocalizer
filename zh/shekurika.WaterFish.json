@@ -1,0 +1,14 @@
+{
+  "0.1 (i.e. 10%) -> every 10th tile has a fish. Respects Maxim fish option. Default: 0.2": "设为 0.1（10%）时，平均每 10 格水域出现一条鱼，同时受鱼数量上限约束。默认值为 0.2。",
+  "Disable trash on Fishing 10": "钓鱼等级达到 10 时隐藏垃圾",
+  "Draw shadows under fish.": "在鱼的下方绘制阴影。",
+  "Draw shadows under trash.": "在垃圾下方绘制阴影。",
+  "Enable trash on Farm": "在农场水域显示垃圾",
+  "Enable trash outside Farm": "在农场以外的水域显示垃圾",
+  "Fish Density": "鱼的密度",
+  "Hide eel-like fish": "隐藏鳗鱼形的鱼",
+  "Maximum fish": "鱼数量上限",
+  "Maximum number of fish. Reduce it if you experience lag. Default: 500": "同时显示的鱼的数量上限。出现卡顿时可以调低。默认值为 500。",
+  "Rotate algae/seaweed": "旋转显示藻类和海草",
+  "Show Treasure in the water": "显示水中的宝藏"
+}
