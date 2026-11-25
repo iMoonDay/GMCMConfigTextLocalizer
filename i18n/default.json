@@ -1,0 +1,17 @@
+{
+  "command.export.usage": "Usage: gmcmtext_export <locale> [mod-id]",
+  "command.export.complete": "Exported {{count}} translation entries for locale '{{locale}}'.",
+  "command.export.none": "No GMCM text needs translation for locale '{{locale}}' in the selected mods.",
+  "command.export.failed": "Couldn't export translation templates. Check the log for details.",
+  "log.patch.ready": "GMCM text hooks installed.",
+  "log.patch.version": "The text hooks could not be enabled for GMCM {{version}}.",
+  "sync.command": "Download all community translation packs from GitHub.",
+  "sync.button": "Sync community translations",
+  "sync.ready": "Download the latest translations from GitHub.",
+  "sync.cached": "Available offline: {{count}} packs.",
+  "sync.running": "Downloading community translations…",
+  "sync.complete": "Synced {{count}} translation packs.",
+  "sync.failed": "Sync failed. You can retry.",
+  "log.translation-file.invalid": "Couldn't read translation file '{{path}}'. The text will fall back to its original value.",
+  "log.mod-manifest.invalid": "Couldn't read mod manifest '{{path}}'."
+}

@@ -1,0 +1,10 @@
+{
+  "Draw Shadows": "绘制阴影",
+  "Fish Opacity": "鱼的不透明度",
+  "How dark the fish shadow should be.": "鱼影的深浅。",
+  "How opaque the fish swimming in the pond should be.": "池塘里游动的鱼的不透明度。",
+  "Shadow Offset": "阴影偏移",
+  "Shadow Opacity": "阴影不透明度",
+  "Vertical offset for the fish shadow in pixels.": "鱼影在垂直方向的偏移量，单位为像素。",
+  "Whether to draw a shadow underneath the swimming fish.": "是否在游动的鱼下方绘制阴影。"
+}

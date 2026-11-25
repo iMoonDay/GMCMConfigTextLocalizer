@@ -1,0 +1,15 @@
+{
+  "1 = softest, smoothest scrolling. 4 = crispest edges, closer to Point. Higher values use more VRAM.": "1 最柔和，滚动最平滑。4 的边缘最清晰，效果更接近点采样。数值越高，显存占用越大。",
+  "Advanced": "高级设置",
+  "Below 100% scale": "缩放低于 100% 时",
+  "Edge sharpness": "边缘锐度",
+  "Filtering (set world and UI independently)": "画面滤镜（场景与界面可分别设置）",
+  "Max intermediate upscale": "最大中间放大倍数",
+  "Memory guard for SharpBilinear/Auto. Higher uses more VRAM.": "限制锐化双线性和自动模式使用的显存。调高后会占用更多显存。",
+  "Off = vanilla. Point = hard edges, perfect at clean scales. SharpBilinear = integer upscale + small blend. Auto = Point at clean scales, SharpBilinear otherwise. Point can shimmer while scrolling; SharpBilinear is smoother.": "关闭使用原版效果。点采样保留锐利边缘，在像素对齐的缩放倍率下效果最佳。锐化双线性先按整数倍率放大，再做轻微混合。自动模式在像素对齐时使用点采样，其余情况使用锐化双线性。点采样在滚动时可能闪烁，锐化双线性更平滑。",
+  "SharpBilinear / Auto downscale": "锐化双线性与自动模式的缩小滤镜",
+  "SharpBilinear / Auto sharpness": "锐化双线性与自动模式的锐度",
+  "Smooth = vanilla bilinear (soft edges). Point = hard edges but uneven 3/4 pixel widths and possible shimmer.": "平滑使用原版双线性滤镜，边缘较柔和。点采样保留锐利边缘，但像素宽度可能在 3 像素和 4 像素之间交替，滚动时可能闪烁。",
+  "UI filter": "界面滤镜",
+  "World filter": "场景滤镜"
+}

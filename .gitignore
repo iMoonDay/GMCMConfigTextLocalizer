@@ -1,0 +1,6 @@
+bin/
+obj/
+dist/
+community-packs.zip
+community-packs.zip.tmp
+overrides/
