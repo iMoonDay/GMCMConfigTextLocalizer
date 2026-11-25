@@ -22,7 +22,7 @@ public sealed class ModEntry : Mod
     private CommunityPacks community = null!;
     private object gmcmApi = null!;
     private ISyncMenuApi? syncMenu;
-    private Task<CommunityPacks.Download?>? pendingSync;
+    private Task<CommunityPacks.Snapshot?>? pendingSync;
     private Rectangle syncButton;
     private string syncMessage = "sync.ready";
     private int packCount;
@@ -129,15 +129,15 @@ public sealed class ModEntry : Mod
         pendingSync = null;
         try
         {
-            CommunityPacks.Download? download = completed.GetAwaiter().GetResult();
-            if (download is null)
+            CommunityPacks.Snapshot? packs = completed.GetAwaiter().GetResult();
+            if (packs is null)
             {
                 syncMessage = "sync.current";
                 Monitor.Log(I18n.Get(syncMessage), LogLevel.Info);
                 return;
             }
-            community.Apply(download);
-            packCount = download.Packs.PackCount;
+            community.Apply(packs);
+            packCount = packs.PackCount;
             syncMessage = "sync.complete";
             Monitor.Log(I18n.Get(syncMessage, new { count = packCount }), LogLevel.Info);
         }

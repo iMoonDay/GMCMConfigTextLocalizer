@@ -28,8 +28,24 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Publish the packs directory
+      - name: Publish packs with their version file
         run: |
           python3 .github/validate-packs.py
-          packs_commit=$(git subtree split --prefix=packs)
+          version=$(git rev-parse HEAD:packs)
+          export GIT_INDEX_FILE="$RUNNER_TEMP/community-packs.index"
+          git read-tree "$version"
+          version_blob=$(printf '%s\n' "$version" | git hash-object -w --stdin)
+          git update-index --add --cacheinfo "100644,$version_blob,version.txt"
+          publish_tree=$(git write-tree)
+          parents=()
+          if git show-ref --verify --quiet refs/remotes/origin/community-packs; then
+            parent=$(git rev-parse origin/community-packs)
+            if [ "$(git rev-parse "$parent^{tree}")" = "$publish_tree" ]; then
+              exit 0
+            fi
+            parents=(-p "$parent")
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          packs_commit=$(git commit-tree "$publish_tree" "${parents[@]}" -m "Publish translation packs $version")
           git push origin "$packs_commit:refs/heads/community-packs"
