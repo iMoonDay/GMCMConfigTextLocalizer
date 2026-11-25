@@ -11,6 +11,8 @@ internal sealed class CommunityPacks
     private const int PackLimit = 1024 * 1024;
     private const int ExpandedLimit = 32 * 1024 * 1024;
     private static readonly Regex PackPath = new(
+        @"\A[^/]+/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\.json\z");
+    private static readonly Regex LegacyPackPath = new(
         @"\A[^/]+/packs/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\.json\z");
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(25) };
     private readonly string cachePath;
@@ -28,7 +30,7 @@ internal sealed class CommunityPacks
         if (new FileInfo(cachePath).Length > ArchiveLimit)
             throw new InvalidDataException("The community archive exceeds the download size limit.");
 
-        snapshot = ReadArchive(File.ReadAllBytes(cachePath));
+        snapshot = ReadArchive(File.ReadAllBytes(cachePath), allowLegacyLayout: true);
         return snapshot.PackCount;
     }
 
@@ -36,7 +38,7 @@ internal sealed class CommunityPacks
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
         using HttpResponseMessage response = await Client.GetAsync(
-            $"https://codeload.github.com/{Repository}/zip/refs/heads/main",
+            $"https://codeload.github.com/{Repository}/zip/refs/heads/community-packs",
             HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength > ArchiveLimit)
@@ -82,7 +84,7 @@ internal sealed class CommunityPacks
         return null;
     }
 
-    private static Snapshot ReadArchive(byte[] bytes)
+    private static Snapshot ReadArchive(byte[] bytes, bool allowLegacyLayout = false)
     {
         using var archive = new ZipArchive(new MemoryStream(bytes, writable: false));
         var locales = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +94,8 @@ internal sealed class CommunityPacks
         foreach (ZipArchiveEntry file in archive.Entries)
         {
             Match match = PackPath.Match(file.FullName);
+            if (!match.Success && allowLegacyLayout)
+                match = LegacyPackPath.Match(file.FullName);
             if (!match.Success)
                 continue;
             expandedSize += file.Length;

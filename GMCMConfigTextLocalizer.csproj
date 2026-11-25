@@ -7,7 +7,7 @@
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GamePath Condition="'$(GamePath)' == ''">E:/SteamLibrary/steamapps/common/Stardew Valley</GamePath>
     <AssemblyName>GMCMConfigTextLocalizer</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
