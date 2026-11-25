@@ -87,15 +87,16 @@ internal sealed class CommunityPacks
     private static Snapshot ReadArchive(byte[] bytes, bool allowLegacyLayout = false)
     {
         using var archive = new ZipArchive(new MemoryStream(bytes, writable: false));
+        Regex layout = allowLegacyLayout && archive.Entries.Any(file => LegacyPackPath.IsMatch(file.FullName))
+            ? LegacyPackPath
+            : PackPath;
         var locales = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.OrdinalIgnoreCase);
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long expandedSize = 0;
         int count = 0;
         foreach (ZipArchiveEntry file in archive.Entries)
         {
-            Match match = PackPath.Match(file.FullName);
-            if (!match.Success && allowLegacyLayout)
-                match = LegacyPackPath.Match(file.FullName);
+            Match match = layout.Match(file.FullName);
             if (!match.Success)
                 continue;
             expandedSize += file.Length;
