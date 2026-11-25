@@ -22,7 +22,7 @@ public sealed class ModEntry : Mod
     private CommunityPacks community = null!;
     private object gmcmApi = null!;
     private ISyncMenuApi? syncMenu;
-    private Task<CommunityPacks.Download>? pendingSync;
+    private Task<CommunityPacks.Download?>? pendingSync;
     private Rectangle syncButton;
     private string syncMessage = "sync.ready";
     private int packCount;
@@ -38,7 +38,8 @@ public sealed class ModEntry : Mod
             if (packCount > 0)
                 syncMessage = "sync.cached";
         }
-        catch (Exception error) when (error is IOException or InvalidDataException or System.Text.Json.JsonException)
+        catch (Exception error) when (error is IOException or InvalidDataException
+            or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
             Monitor.Log(error.Message, LogLevel.Warn);
         }
@@ -81,6 +82,7 @@ public sealed class ModEntry : Mod
         }
 
         Monitor.Log(I18n.Get("log.patch.ready"), LogLevel.Info);
+        StartPackSync();
     }
 
     private void DrawSyncButton(SpriteBatch batch, Vector2 position)
@@ -116,8 +118,7 @@ public sealed class ModEntry : Mod
             return;
 
         syncMessage = "sync.running";
-        Monitor.Log(I18n.Get(syncMessage), LogLevel.Info);
-        pendingSync = CommunityPacks.Fetch();
+        pendingSync = Task.Run(community.Fetch);
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -128,7 +129,13 @@ public sealed class ModEntry : Mod
         pendingSync = null;
         try
         {
-            CommunityPacks.Download download = completed.GetAwaiter().GetResult();
+            CommunityPacks.Download? download = completed.GetAwaiter().GetResult();
+            if (download is null)
+            {
+                syncMessage = "sync.current";
+                Monitor.Log(I18n.Get(syncMessage), LogLevel.Info);
+                return;
+            }
             community.Apply(download);
             packCount = download.Packs.PackCount;
             syncMessage = "sync.complete";

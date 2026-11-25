@@ -1,4 +1,7 @@
 using System.IO.Compression;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -14,11 +17,14 @@ internal sealed class CommunityPacks
         @"\A[^/]+/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\.json\z");
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(25) };
     private readonly string cachePath;
+    private readonly string versionPath;
     private Snapshot snapshot = new(new(StringComparer.OrdinalIgnoreCase), 0);
+    private EntityTagHeaderValue? version;
 
     public CommunityPacks(string directory)
     {
         cachePath = Path.Combine(directory, "community-packs.zip");
+        versionPath = Path.Combine(directory, "community-packs.etag");
     }
 
     public int LoadCache()
@@ -28,16 +34,31 @@ internal sealed class CommunityPacks
         if (new FileInfo(cachePath).Length > ArchiveLimit)
             throw new InvalidDataException("The community archive exceeds the download size limit.");
 
-        snapshot = ReadArchive(File.ReadAllBytes(cachePath));
+        byte[] bytes = File.ReadAllBytes(cachePath);
+        snapshot = ReadArchive(bytes);
+        if (File.Exists(versionPath))
+        {
+            string[] metadata = File.ReadAllLines(versionPath);
+            // Only send a validator that belongs to the ZIP we successfully loaded.
+            if (metadata.Length == 2 && metadata[0] == CacheHash(bytes)
+                && EntityTagHeaderValue.TryParse(metadata[1], out var cachedVersion)
+                && cachedVersion != EntityTagHeaderValue.Any)
+                version = cachedVersion;
+        }
         return snapshot.PackCount;
     }
 
-    public static async Task<Download> Fetch()
+    public async Task<Download?> Fetch()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
-        using HttpResponseMessage response = await Client.GetAsync(
-            $"https://codeload.github.com/{Repository}/zip/refs/heads/community-packs",
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"https://codeload.github.com/{Repository}/zip/refs/heads/community-packs");
+        if (version is not null && File.Exists(cachePath))
+            request.Headers.IfNoneMatch.Add(version);
+        using HttpResponseMessage response = await Client.SendAsync(request,
             HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotModified && request.Headers.IfNoneMatch.Count > 0)
+            return null;
         response.EnsureSuccessStatusCode();
         if (response.Content.Headers.ContentLength > ArchiveLimit)
             throw new InvalidDataException("The community archive exceeds the download size limit.");
@@ -54,17 +75,27 @@ internal sealed class CommunityPacks
         }
 
         byte[] bytes = archive.ToArray();
-        return new Download(bytes, ReadArchive(bytes));
+        Snapshot packs = ReadArchive(bytes);
+        EntityTagHeaderValue? downloadedVersion = response.Headers.ETag;
+        string metadata = downloadedVersion is null ? "" : $"{CacheHash(bytes)}\n{downloadedVersion}";
+        WriteAtomically(versionPath, System.Text.Encoding.UTF8.GetBytes(metadata));
+        WriteAtomically(cachePath, bytes);
+        return new Download(packs, downloadedVersion);
     }
 
     public void Apply(Download result)
     {
-        string temporary = cachePath + ".tmp";
+        snapshot = result.Packs;
+        version = result.Version;
+    }
+
+    private static void WriteAtomically(string path, byte[] content)
+    {
+        string temporary = $"{path}.{Guid.NewGuid():N}.tmp";
         try
         {
-            File.WriteAllBytes(temporary, result.Archive);
-            File.Move(temporary, cachePath, overwrite: true);
-            snapshot = result.Packs;
+            File.WriteAllBytes(temporary, content);
+            File.Move(temporary, path, overwrite: true);
         }
         finally
         {
@@ -72,6 +103,8 @@ internal sealed class CommunityPacks
                 File.Delete(temporary);
         }
     }
+
+    private static string CacheHash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes));
 
     public string? Find(string locale, string modId, string source)
     {
@@ -126,7 +159,7 @@ internal sealed class CommunityPacks
         return new Snapshot(locales, count);
     }
 
-    internal sealed record Download(byte[] Archive, Snapshot Packs);
+    internal sealed record Download(Snapshot Packs, EntityTagHeaderValue? Version);
     internal sealed record Snapshot(
         Dictionary<string, Dictionary<string, Dictionary<string, string>>> Locales, int PackCount);
 }

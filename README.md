@@ -6,7 +6,9 @@
 
 安装 SMAPI 4.1 或更高版本和 GMCM 1.13 或更高版本。将构建产物 `GMCMConfigTextLocalizer.dll`、`manifest.json` 和 `i18n` 一起放入游戏的 `Mods/GMCMConfigTextLocalizer` 目录。
 
-在 GMCM 中打开「GMCM 配置文本本地化」，点击「同步社区翻译」。也可以在 SMAPI 控制台运行 `gmcmtext_sync`。模组会一次下载 GitHub 上仅含翻译文件的 `community-packs` 分支，按游戏当前语言使用。同步后重新打开对应设置页即可查看译文。最近一次成功下载的译文会缓存下来，可离线使用。
+每次启动游戏时，模组会在后台检查 GitHub 上的社区翻译。首次使用或翻译包有更新时，会下载仅含翻译文件的 `community-packs` 分支。GitHub 确认版本相同时，只返回检查结果。检查期间和离线时都可以使用最近一次成功下载的译文。
+
+也可以在 GMCM 中打开「GMCM 配置文本本地化」并点击「同步社区翻译」，或在 SMAPI 控制台运行 `gmcmtext_sync`。同步后重新打开对应设置页即可查看当前语言的译文。
 
 翻译优先级依次为目标模组自带译文、本地 `overrides`、社区翻译包、原文。
 
