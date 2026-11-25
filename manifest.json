@@ -6,7 +6,7 @@
   "UniqueID": "iMoonDay.GMCMConfigTextLocalizer",
   "EntryDll": "GMCMConfigTextLocalizer.dll",
   "MinimumApiVersion": "4.1.0",
-  "UpdateKeys": ["GitHub:iMoonDay/GMCMConfigTextLocalizer"],
+  "UpdateKeys": [],
   "Dependencies": [
     {
       "UniqueID": "spacechase0.GenericModConfigMenu",

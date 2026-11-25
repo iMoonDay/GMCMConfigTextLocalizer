@@ -12,8 +12,6 @@ internal sealed class CommunityPacks
     private const int ExpandedLimit = 32 * 1024 * 1024;
     private static readonly Regex PackPath = new(
         @"\A[^/]+/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\.json\z");
-    private static readonly Regex LegacyPackPath = new(
-        @"\A[^/]+/packs/([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)/([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)\.json\z");
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(25) };
     private readonly string cachePath;
     private Snapshot snapshot = new(new(StringComparer.OrdinalIgnoreCase), 0);
@@ -30,7 +28,7 @@ internal sealed class CommunityPacks
         if (new FileInfo(cachePath).Length > ArchiveLimit)
             throw new InvalidDataException("The community archive exceeds the download size limit.");
 
-        snapshot = ReadArchive(File.ReadAllBytes(cachePath), allowLegacyLayout: true);
+        snapshot = ReadArchive(File.ReadAllBytes(cachePath));
         return snapshot.PackCount;
     }
 
@@ -84,21 +82,20 @@ internal sealed class CommunityPacks
         return null;
     }
 
-    private static Snapshot ReadArchive(byte[] bytes, bool allowLegacyLayout = false)
+    private static Snapshot ReadArchive(byte[] bytes)
     {
         using var archive = new ZipArchive(new MemoryStream(bytes, writable: false));
-        Regex layout = allowLegacyLayout && archive.Entries.Any(file => LegacyPackPath.IsMatch(file.FullName))
-            ? LegacyPackPath
-            : PackPath;
         var locales = new Dictionary<string, Dictionary<string, Dictionary<string, string>>>(StringComparer.OrdinalIgnoreCase);
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long expandedSize = 0;
         int count = 0;
         foreach (ZipArchiveEntry file in archive.Entries)
         {
-            Match match = layout.Match(file.FullName);
-            if (!match.Success)
+            if (file.Name.Length == 0)
                 continue;
+            Match match = PackPath.Match(file.FullName);
+            if (!match.Success)
+                throw new InvalidDataException($"Unexpected file in the community archive: {file.FullName}");
             expandedSize += file.Length;
             if (file.Length > PackLimit || expandedSize > ExpandedLimit || !paths.Add($"{match.Groups[1].Value}/{match.Groups[2].Value}"))
                 throw new InvalidDataException($"Invalid community pack size or duplicate: {file.FullName}");

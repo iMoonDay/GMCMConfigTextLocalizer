@@ -4,7 +4,7 @@
 
 ## 同步翻译
 
-安装 SMAPI 4.1 或更高版本、GMCM 1.13 或更高版本，再把下载包中的模组目录放到游戏的 `Mods` 目录。由旧版本升级时，把旧目录中的 `overrides` 移到新目录，然后从 `Mods` 移走旧版本。[下载安装包](https://github.com/iMoonDay/GMCMConfigTextLocalizer/releases/latest)
+安装 SMAPI 4.1 或更高版本和 GMCM 1.13 或更高版本。将构建产物 `GMCMConfigTextLocalizer.dll`、`manifest.json` 和 `i18n` 一起放入游戏的 `Mods/GMCMConfigTextLocalizer` 目录。
 
 在 GMCM 中打开「GMCM 配置文本本地化」，点击「同步社区翻译」。也可以在 SMAPI 控制台运行 `gmcmtext_sync`。模组会一次下载 GitHub 上仅含翻译文件的 `community-packs` 分支，按游戏当前语言使用。同步后重新打开对应设置页即可查看译文。最近一次成功下载的译文会缓存下来，可离线使用。
 
