@@ -1,0 +1,10 @@
+{
+  "Difficulty": "难度",
+  "Elevator Step": "电梯楼层间隔",
+  "ElevatorCostPerStep": "每层电梯费用",
+  "FirstLevelElevatorActive": "电梯入口设在第 1 层",
+  "Set this to a higher number than 0 to enable payment for each level travelled using the elevator. The formula is (Position of Elevator displayed) * ElevatorCostPerStep. This cost will be subtracted from your current available money. If you do not have enough, the elevator will not be used": "设为大于 0 的数值后，乘坐电梯将按楼层收费。费用等于电梯上显示的目标楼层数乘以每层电梯费用，并从当前持有金钱中扣除。余额不足时无法乘坐。",
+  "Set this to true, to move the elevator entry to the first level. Enable when you cannot see the elevator in cave entrance": "开启后，电梯入口会移到洞穴第 1 层。如果在洞穴入口看不到电梯，可以开启此选项。",
+  "This value also effects how often elevators appear. A higher value in Difficulty means that less elevators appear and you need to get further down to unlock new elevators": "难度也会影响电梯停靠的楼层间隔。难度越高，停靠楼层越少，需要下到更深的楼层才能解锁下一站。",
+  "This value determines how often elevators appear": "设置电梯停靠的楼层间隔。"
+}

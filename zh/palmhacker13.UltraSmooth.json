@@ -1,9 +1,13 @@
 {
   "16-Byte Co-op Bitmask Micro-Delta": "16 字节联机位掩码增量同步",
   "Allocation-free LRU cache for character kerning and line-break measurements.": "使用不分配内存的 LRU 缓存，保存字距和换行测量结果。",
+  "Balanced": "均衡",
+  "Custom": "自定义",
   "Cutscene Anti-Stuck Watchdog": "过场动画卡住检测",
   "Dialogue Glyph & SpriteText Cache": "对话字形与 SpriteText 缓存",
+  "Eco": "节能",
   "Encodes machine and chest states into compact 16-byte CPU cache-line packets with delta suppression.": "将机器和箱子的状态编码为适合 CPU 缓存的 16 字节数据包，并抑制重复的增量数据。",
+  "Enthusiast": "发烧级",
   "Event Precondition Fast-Filter": "事件触发条件快速筛选",
   "Location Spatial Grid (16x16 Chunks)": "地图空间网格（16×16 格区块）",
   "Machine Audio Polyphony Limiter": "同类机器音效并发限制",
