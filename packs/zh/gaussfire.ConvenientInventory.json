@@ -8,5 +8,10 @@
   "6: Thick dark border": "6: 深色粗边框",
   "7: Gold decorative border": "7: 金色装饰边框",
   "8: Custom thick border": "8: 自定义粗边框",
-  "9: Custom dashed border": "9: 自定义虚线边框"
+  "9: Custom dashed border": "9: 自定义虚线边框",
+  "All": "全部",
+  "Except Tools": "除了工具",
+  "Except Tools and Weapons": "除了工具和武器",
+  "Except Tools, Weapons, and Equips": "除了工具、武器和装备",
+  "None": "无"
 }
