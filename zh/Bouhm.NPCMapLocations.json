@@ -109,5 +109,12 @@
   "Whether to show the bookseller when he's in town.": "书商来到镇上时，是否在地图上显示他。",
   "Whether to show villagers that would normally be hidden.": "是否在地图上显示通常会隐藏的村民。",
   "Willy": "威利",
-  "Wizard": "法师"
+  "Wizard": "法师",
+  "Always hidden": "总是隐藏",
+  "Always visible": "总是可见",
+  "Default": "默认",
+  "Only show those not spoken to today": "仅显示今天未交谈过的",
+  "Only show those spoken to today": "仅显示今天交谈过的",
+  "Show all": "显示全部",
+  "Vanilla (experimental)": "原版（实验性）"
 }

@@ -2,5 +2,8 @@
   "Additionally show tooltip hints in the Collections tab for how to obtain items. For \"All Items\" setting, toggle display with click/Action/Tool Button. (Items from mods not guaranteed to show hints.)": "在收集品标签页的悬浮提示中显示物品的获取方式。设为「所有物品」时，可用鼠标点击、交互键或使用工具键切换提示。部分模组物品可能没有提示。",
   "Collections Tab Hints": "收集品标签页提示",
   "Show Spoilers": "显示剧透",
-  "Whether hints should include spoilers of certain things not yet encountered.": "允许提示透露玩家尚未遇到的内容。"
+  "Whether hints should include spoilers of certain things not yet encountered.": "允许提示透露玩家尚未遇到的内容。",
+  "All Items": "全部物品",
+  "Off": "关闭",
+  "Unknowns Only": "仅未知"
 }
