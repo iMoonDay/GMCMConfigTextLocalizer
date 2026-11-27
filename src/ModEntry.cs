@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
@@ -6,6 +7,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Menus;
 
@@ -19,37 +21,35 @@ public sealed class ModEntry : Mod
     private readonly ConditionalWeakTable<object, Func<string, string>> choiceFormatters = new();
     private readonly ConditionalWeakTable<object, Func<string>> pageTitles = new();
     private TranslationStore translations = null!;
-    private CommunityPacks community = null!;
+    private GmcmPageEditor? pageEditor;
+    private readonly PerScreen<TranslationManagementList> management = new(() => new());
+    private HashSet<string> disabledMods = new(StringComparer.OrdinalIgnoreCase);
+    private bool translationsEnabled;
     private object gmcmApi = null!;
     private ISyncMenuApi? syncMenu;
-    private Task<CommunityPacks.Snapshot?>? pendingSync;
+    private Task<IReadOnlyList<CommunityPacks.TranslationFile>>? pendingSync;
+    private Rectangle globalCheckbox;
     private Rectangle syncButton;
+    private Rectangle exportButton;
+    private Rectangle folderButton;
+    private bool folderOpenFailed;
     private string syncMessage = "sync.ready";
-    private int packCount;
+    private int syncedCount;
 
     public override void Entry(IModHelper helper)
     {
         I18n.Initialize(helper.Translation);
         instance = this;
-        community = new CommunityPacks(helper.DirectoryPath);
-        try
-        {
-            packCount = community.LoadCache();
-            if (packCount > 0)
-                syncMessage = "sync.cached";
-        }
-        catch (Exception error) when (error is IOException or InvalidDataException
-            or UnauthorizedAccessException or System.Text.Json.JsonException)
-        {
-            Monitor.Log(error.Message, LogLevel.Warn);
-        }
+        TranslationSettings settings = helper.ReadConfig<TranslationSettings>();
+        translationsEnabled = settings.Enabled;
+        disabledMods.UnionWith(settings.DisabledMods ?? []);
         translations = new TranslationStore(
             helper.DirectoryPath,
             Directory.GetParent(helper.DirectoryPath)?.FullName
                 ?? throw new InvalidOperationException("The mod directory has no Mods parent."),
             helper.Translation.Locale,
             Monitor,
-            community
+            modId => translationsEnabled && IsModTranslationEnabled(modId)
         );
         helper.Events.GameLoop.GameLaunched += OnGameLaunched;
         helper.Events.Content.LocaleChanged += OnLocaleChanged;
@@ -71,45 +71,311 @@ public sealed class ModEntry : Mod
             Monitor.Log(I18n.Get("log.patch.version", new { version }) + Environment.NewLine + error.Message, LogLevel.Warn);
             return;
         }
+        var editorPatches = new Harmony(ModManifest.UniqueID + ".Editor");
+        try
+        {
+            pageEditor = new GmcmPageEditor(gmcmApi.GetType().Assembly, editorPatches, translations,
+                page => pageTitles.TryGetValue(page, out Func<string>? title) ? title() : null,
+                ReadOptionSources, CreateModExportMenu, Helper, Monitor);
+        }
+        catch (Exception error)
+        {
+            editorPatches.UnpatchAll(editorPatches.Id);
+            string version = Helper.ModRegistry.Get(GmcmId)?.Manifest.Version.ToString() ?? "?";
+            Monitor.Log(I18n.Get("log.editor.version", new { version }) + Environment.NewLine + error, LogLevel.Warn);
+        }
+
         Helper.ConsoleCommands.Add("gmcmtext_export", I18n.Get("command.export.usage"), OnExportCommand);
         Helper.ConsoleCommands.Add("gmcmtext_sync", I18n.Get("sync.command"), (_, _) => StartPackSync());
         syncMenu = Helper.ModRegistry.GetApi<ISyncMenuApi>(GmcmId);
         if (syncMenu is not null)
         {
-            syncMenu.Register(ModManifest, () => { }, () => { }, titleScreenOnly: false);
-            syncMenu.AddComplexOption(ModManifest, () => "", DrawSyncButton, height: () => 96);
-            Helper.Events.Input.ButtonPressed += OnSyncButtonPressed;
+            syncMenu.Register(ModManifest, () => SaveTranslationSettings(true, new(StringComparer.OrdinalIgnoreCase)),
+                () => { }, titleScreenOnly: false);
+            syncMenu.AddComplexOption(ModManifest, () => "", DrawActions, height: () => 269);
+            if (pageEditor is not null)
+                syncMenu.AddComplexOption(ModManifest, () => "", DrawManagement,
+                    beforeMenuOpened: RefreshManagement, height: () => management.Value.Height);
+            Helper.Events.Input.ButtonPressed += OnActionPressed;
         }
 
         Monitor.Log(I18n.Get("log.patch.ready"), LogLevel.Info);
         StartPackSync();
     }
 
-    private void DrawSyncButton(SpriteBatch batch, Vector2 position)
+    private void DrawActions(SpriteBatch batch, Vector2 position)
     {
-        string label = I18n.Get("sync.button");
-        Point size = Game1.smallFont.MeasureString(label).ToPoint();
-        syncButton = new Rectangle((int)position.X + 8, (int)position.Y + 4, Math.Max(200, size.X + 40), 44);
-        bool hover = pendingSync is null && syncButton.Contains(Game1.getMouseX(ui_scale: true), Game1.getMouseY(ui_scale: true));
-        IClickableMenu.drawTextureBox(batch, syncButton.X, syncButton.Y, syncButton.Width, syncButton.Height,
-            hover ? Color.Wheat : Color.White);
-        Utility.drawTextWithShadow(batch, label, Game1.smallFont,
-            new Vector2(syncButton.Center.X - size.X / 2f, syncButton.Center.Y - size.Y / 2f), Game1.textColor);
-        Utility.drawTextWithShadow(batch, I18n.Get(syncMessage, new { count = packCount }), Game1.smallFont,
+        int top = (int)position.Y + 4;
+        int left = (int)position.X + 8;
+        Rectangle? clip = null;
+        if (pageEditor is not null && GmcmPageEditor.CurrentMenu() is { } menu)
+        {
+            Rectangle table = pageEditor.GetTableBounds(menu);
+            left = table.Left + 10;
+            table.Inflate(20, 20);
+            clip = table;
+        }
+        DrawGlobalCheckbox(batch, left, top, clip);
+        top += 44;
+        syncButton = DrawAction(batch, I18n.Get("sync.button"), left, top, pendingSync is null);
+        Utility.drawTextWithShadow(batch, I18n.Get(syncMessage, new { count = syncedCount }), Game1.smallFont,
             new Vector2(syncButton.X, syncButton.Bottom + 6), Game1.textColor);
+        exportButton = DrawAction(batch, I18n.Get("export.button"), left, top + 94, enabled: true);
+        folderButton = DrawAction(batch, I18n.Get("folder.open"), left, top + 145, enabled: true);
+        if (folderOpenFailed)
+            Utility.drawTextWithShadow(batch, I18n.Get("folder.open-failed"), Game1.smallFont,
+                new Vector2(folderButton.X, folderButton.Bottom + 6), Game1.textColor);
+        if (clip is { } visible)
+        {
+            syncButton = Rectangle.Intersect(syncButton, visible);
+            exportButton = Rectangle.Intersect(exportButton, visible);
+            folderButton = Rectangle.Intersect(folderButton, visible);
+        }
     }
 
-    private void OnSyncButtonPressed(object? sender, ButtonPressedEventArgs e)
+    private void DrawGlobalCheckbox(SpriteBatch batch, int left, int top, Rectangle? clip)
     {
-        if (e.Button != SButton.MouseLeft || pendingSync is not null
-            || !syncButton.Contains(Game1.getMouseX(ui_scale: true), Game1.getMouseY(ui_scale: true))
-            || !syncMenu!.TryGetCurrentMenu(out IManifest? manifest, out _)
+        const int size = TranslationManagementList.CheckboxSize;
+        string label = I18n.Get("management.global-enabled");
+        int labelX = left + size + TranslationManagementList.CheckboxGap;
+        var checkbox = new Rectangle(left, top, size, size);
+        var target = new Rectangle(left, top, labelX - left + (int)Math.Ceiling(Game1.smallFont.MeasureString(label).X), size);
+        globalCheckbox = clip is { } visible ? Rectangle.Intersect(target, visible) : target;
+        bool hover = globalCheckbox.Contains(Game1.getMouseX(ui_scale: true), Game1.getMouseY(ui_scale: true));
+        TranslationManagementList.DrawCheckbox(batch, checkbox, translationsEnabled, hover);
+        Utility.drawTextWithShadow(batch, label, Game1.smallFont, new Vector2(labelX, top + 5), Game1.textColor);
+    }
+
+    private static Rectangle DrawAction(SpriteBatch batch, string label, int x, int y, bool enabled)
+    {
+        Vector2 size = Game1.smallFont.MeasureString(label);
+        var bounds = new Rectangle(x, y, Math.Max(200, (int)size.X + 40), 44);
+        bool hover = enabled && bounds.Contains(Game1.getMouseX(ui_scale: true), Game1.getMouseY(ui_scale: true));
+        IClickableMenu.drawTextureBox(batch, x, y, bounds.Width, bounds.Height, hover ? Color.Wheat : Color.White);
+        Utility.drawTextWithShadow(batch, label, Game1.smallFont,
+            new Vector2(bounds.Center.X - size.X / 2f, bounds.Center.Y - size.Y / 2f), Game1.textColor);
+        return bounds;
+    }
+
+    private void OnActionPressed(object? sender, ButtonPressedEventArgs e)
+    {
+        if (e.Button != SButton.MouseLeft || !syncMenu!.TryGetCurrentMenu(out IManifest? manifest, out _)
             || manifest?.UniqueID != ModManifest.UniqueID)
+            return;
+
+        var mouse = new Point(Game1.getMouseX(ui_scale: true), Game1.getMouseY(ui_scale: true));
+        bool global = globalCheckbox.Contains(mouse);
+        bool sync = pendingSync is null && syncButton.Contains(mouse);
+        bool export = exportButton.Contains(mouse);
+        bool folder = folderButton.Contains(mouse);
+        Action? manage = management.Value.FindAction(mouse);
+        if (!global && !sync && !export && !folder && manage is null)
             return;
 
         Helper.Input.Suppress(e.Button);
         Game1.playSound("smallSelect");
-        StartPackSync();
+        if (global)
+            SaveTranslationSettings(!translationsEnabled, disabledMods);
+        else if (manage is not null)
+            manage();
+        else if (export)
+            OpenExportMenu();
+        else if (folder)
+            OpenOverridesFolder();
+        else
+            StartPackSync();
+    }
+
+    private bool IsModTranslationEnabled(string modId) => !disabledMods.Contains(modId);
+
+    private void SaveTranslationSettings(bool enabled, HashSet<string> updated)
+    {
+        try
+        {
+            Helper.WriteConfig(new TranslationSettings
+            {
+                Enabled = enabled,
+                DisabledMods = updated.OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray()
+            });
+            translationsEnabled = enabled;
+            disabledMods = updated;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            Monitor.Log(I18n.Get("management.save-failed") + Environment.NewLine + error.Message, LogLevel.Warn);
+        }
+    }
+
+    private void ToggleTranslation(TranslationManagementList.Row row)
+    {
+        var updated = new HashSet<string>(disabledMods, StringComparer.OrdinalIgnoreCase);
+        if (!updated.Add(row.Mod.Id))
+            updated.Remove(row.Mod.Id);
+        SaveTranslationSettings(translationsEnabled, updated);
+    }
+
+    private void SetModTranslations(bool enabled, IEnumerable<string> modIds)
+    {
+        var updated = new HashSet<string>(disabledMods, StringComparer.OrdinalIgnoreCase);
+        if (enabled)
+            updated.ExceptWith(modIds);
+        else
+            updated.UnionWith(modIds);
+        SaveTranslationSettings(translationsEnabled, updated);
+    }
+
+    private void RefreshManagement()
+    {
+        var overrides = translations.ReadOverrideCatalog();
+        var sources = ReadSources(null, includeInternalMods: true, reportReadError: (id, error) =>
+            Monitor.Log($"{id}: {error.Message}", LogLevel.Trace))
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Source))
+            .ToLookup(entry => entry.ModId, entry => entry.Source, StringComparer.OrdinalIgnoreCase);
+        string locale = translations.GetExportLocale();
+        var rows = Helper.ModRegistry.GetAll().Select(mod => mod.Manifest.UniqueID)
+            .Concat(ReadPages().Select(page => page.ModId)).Concat(overrides.Keys).Concat(translations.ReadIgnoredModIds())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(modId =>
+            {
+                IManifest? manifest = Helper.ModRegistry.Get(modId)?.Manifest;
+                var values = overrides.GetValueOrDefault(modId);
+                var ignored = translations.GetIgnoredSources(modId);
+                string name = manifest?.Name ?? (values is not null || ignored.Count > 0 ? $"{modId}.json" : modId);
+                int count = values?.Count(entry => !string.IsNullOrWhiteSpace(entry.Key)
+                    && !string.IsNullOrWhiteSpace(entry.Value) && !ignored.Contains(entry.Key)) ?? 0;
+                var candidates = sources[modId].Concat(values?.Keys.AsEnumerable() ?? [])
+                    .Where(source => !string.IsNullOrWhiteSpace(source)).Distinct(StringComparer.Ordinal).ToArray();
+                NativeTextIndex? localized = candidates.Length > 0 ? translations.ReadLocalizedTextIndex(modId) : null;
+                int pending = candidates.Count(source => TranslationStore.GetStatus(source, values?.GetValueOrDefault(source),
+                    localized, locale, ignored.Contains(source)) == TranslationStatus.Pending);
+                return new TranslationManagementList.Row(new ExportMod(modId, name), manifest is not null, count, pending);
+            })
+            .OrderByDescending(row => row.Installed)
+            .ThenBy(row => row.Mod.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(row => row.Mod.Id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        management.Value.SetRows(rows);
+    }
+
+    private void DrawManagement(SpriteBatch batch, Vector2 position)
+    {
+        if (GmcmPageEditor.CurrentMenu() is not { } menu)
+            return;
+
+        Rectangle table = pageEditor!.GetTableBounds(menu);
+        management.Value.Draw(batch, position, table, IsModTranslationEnabled, SetModTranslations, ToggleTranslation, row =>
+        {
+            try
+            {
+                pageEditor.OpenForMod(menu, row.Mod, ReadModEditorSources(row.Mod.Id), () =>
+                {
+                    int previousHeight = management.Value.Height;
+                    RefreshManagement();
+                    if (management.Value.Height < previousHeight)
+                        pageEditor.ClampTableScroll(menu);
+                });
+            }
+            catch (Exception error)
+            {
+                Monitor.Log(I18n.Get("editor.open-failed") + Environment.NewLine + error, LogLevel.Error);
+            }
+        }, () => pageEditor.ClampTableScroll(menu));
+    }
+
+    private IEnumerable<string> ReadModEditorSources(string modId)
+    {
+        if (Helper.ModRegistry.Get(modId) is { } mod)
+            yield return mod.Manifest.Name;
+        foreach (ExportText entry in ReadSources(modId, includeInternalMods: true))
+            yield return entry.Source;
+        if (translations.ReadOverrideCatalog().TryGetValue(modId, out var overrides))
+        {
+            foreach (string source in overrides.Keys)
+                yield return source;
+        }
+        foreach (string source in translations.GetIgnoredSources(modId))
+            yield return source;
+    }
+
+    private void OpenOverridesFolder()
+    {
+        folderOpenFailed = false;
+        try
+        {
+            string path = Directory.CreateDirectory(Path.Combine(translations.ModDirectory, "overrides")).FullName;
+            using Process? process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            folderOpenFailed = true;
+            Monitor.Log(I18n.Get("folder.open-failed") + Environment.NewLine + error.Message, LogLevel.Warn);
+        }
+    }
+
+    private void OpenExportMenu()
+    {
+        IClickableMenu? parent = Game1.activeClickableMenu;
+        var title = parent as TitleMenu;
+        if (title is not null)
+            parent = TitleMenu.subMenu;
+        if (parent is null)
+            return;
+
+        var mods = ReadPages()
+            .Select(page => page.ModId)
+            .Where(IsExportable)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(id => new ExportMod(id, Helper.ModRegistry.Get(id)?.Manifest.Name ?? id))
+            .OrderBy(mod => mod.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(mod => mod.Id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string locale = translations.GetExportLocale();
+
+        var menu = CreateExportMenu(mods, locale, ids => ReadSources(null, ids),
+            () =>
+            {
+                if (title is not null)
+                    TitleMenu.subMenu = parent;
+                else
+                    Game1.activeClickableMenu = parent;
+            }, singleMod: false);
+        try
+        {
+            menu.Load();
+        }
+        catch (Exception error)
+        {
+            Monitor.Log(I18n.Get("command.export.failed") + Environment.NewLine + error, LogLevel.Error);
+            return;
+        }
+        if (title is not null)
+            title.ForceSubmenu(menu);
+        else
+            Game1.activeClickableMenu = menu;
+    }
+
+    private ExportMenu CreateModExportMenu(ExportMod mod, string locale, Action close)
+    {
+        var menu = CreateExportMenu([mod], locale,
+            _ => ReadSources(mod.Id, includeInternalMods: true), close, singleMod: true);
+        menu.Load();
+        return menu;
+    }
+
+    private ExportMenu CreateExportMenu(IReadOnlyList<ExportMod> mods, string locale,
+        Func<IReadOnlySet<string>, IEnumerable<ExportText>> readSources, Action close, bool singleMod) =>
+        new(mods, locale, readSources, translations, entries => ExportFromMenu(locale, entries), close,
+            error => Monitor.Log(error.ToString(), LogLevel.Error), singleMod);
+
+    private bool IsExportable(string id)
+        => !id.Equals("SMAPI", StringComparison.OrdinalIgnoreCase)
+            && !id.Equals(ModManifest.UniqueID, StringComparison.OrdinalIgnoreCase);
+
+    private int ExportFromMenu(string locale, IReadOnlyList<ExportText> entries)
+    {
+        translations.ClearCache();
+        return TemplateExporter.ExportSelected(translations.ModDirectory, locale,
+            entries.Select(entry => (entry.ModId, entry.Source)));
     }
 
     private void StartPackSync()
@@ -118,7 +384,7 @@ public sealed class ModEntry : Mod
             return;
 
         syncMessage = "sync.running";
-        pendingSync = Task.Run(community.Fetch);
+        pendingSync = CommunityPacks.Fetch();
     }
 
     private void OnUpdateTicked(object? sender, UpdateTickedEventArgs e)
@@ -129,17 +395,7 @@ public sealed class ModEntry : Mod
         pendingSync = null;
         try
         {
-            CommunityPacks.Snapshot? packs = completed.GetAwaiter().GetResult();
-            if (packs is null)
-            {
-                syncMessage = "sync.current";
-                Monitor.Log(I18n.Get(syncMessage), LogLevel.Info);
-                return;
-            }
-            community.Apply(packs);
-            packCount = packs.PackCount;
-            syncMessage = "sync.complete";
-            Monitor.Log(I18n.Get(syncMessage, new { count = packCount }), LogLevel.Info);
+            ApplyCommunityTranslations(completed.GetAwaiter().GetResult());
         }
         catch (Exception error) when (error is IOException or InvalidDataException or HttpRequestException
             or OperationCanceledException or UnauthorizedAccessException or System.Text.Json.JsonException)
@@ -147,6 +403,30 @@ public sealed class ModEntry : Mod
             syncMessage = "sync.failed";
             Monitor.Log(I18n.Get(syncMessage) + Environment.NewLine + error.Message, LogLevel.Warn);
         }
+    }
+
+    private void ApplyCommunityTranslations(IReadOnlyList<CommunityPacks.TranslationFile> files)
+    {
+        syncedCount = 0;
+        bool failed = false;
+        foreach (CommunityPacks.TranslationFile file in files)
+        {
+            try
+            {
+                syncedCount += translations.MergeCommunityTranslations(file);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            {
+                failed = true;
+                Monitor.Log(I18n.Get("sync.file-failed", new { locale = file.Locale, mod = file.ModId })
+                    + Environment.NewLine + error.Message, LogLevel.Warn);
+            }
+        }
+
+        syncMessage = failed ? "sync.partial" : syncedCount > 0 ? "sync.complete" : "sync.current";
+        Monitor.Log(I18n.Get(syncMessage, new { count = syncedCount }), failed ? LogLevel.Warn : LogLevel.Info);
+        if (syncedCount > 0 && syncMenu?.TryGetCurrentMenu(out IManifest? manifest, out _) == true && manifest?.UniqueID == ModManifest.UniqueID)
+            RefreshManagement();
     }
 
     private void InstallPatches()
@@ -238,9 +518,11 @@ public sealed class ModEntry : Mod
 
     private static void AfterFormatChoiceGetter(object __instance, ref Func<string, string> __result)
     {
-        if (instance.options.TryGetValue(__instance, out OptionText? text)
-            && instance.choiceFormatters.TryGetValue(__instance, out Func<string, string>? formatter))
-            __result = value => instance.translations.Resolve(text.ModId, formatter(value));
+        if (!instance.options.TryGetValue(__instance, out OptionText? text))
+            return;
+
+        Func<string, string> formatter = instance.CaptureChoiceFormatter(__instance, __result);
+        __result = value => instance.translations.Resolve(text.ModId, formatter(value));
     }
 
     private static void AfterSetActivePage(object __instance, string pageId)
@@ -274,9 +556,9 @@ public sealed class ModEntry : Mod
         return () => translations.Resolve(modId, source() ?? "");
     }
 
-    private void CaptureChoiceFormatter(object option, Func<string, string>? formatter)
+    private Func<string, string> CaptureChoiceFormatter(object option, Func<string, string>? formatter)
     {
-        choiceFormatters.GetValue(option, _ => value => formatter?.Invoke(value) ?? value);
+        return choiceFormatters.GetValue(option, _ => value => formatter?.Invoke(value) ?? value);
     }
 
     private void CapturePage(object page, string modId, bool force)
@@ -349,31 +631,65 @@ public sealed class ModEntry : Mod
         return (IEnumerable)AccessTools.Property(page.GetType(), "Options")!.GetValue(page)!;
     }
 
-    private IEnumerable<(string ModId, string Source)> ReadSources(string? requestedMod)
+    private (string? Name, string? Tooltip, string[] Choices) ReadOptionSources(object option)
+    {
+        if (!options.TryGetValue(option, out OptionText? text))
+            return (null, null, []);
+
+        string? name = text.Name?.Invoke();
+        string? tooltip = text.Tooltip?.Invoke();
+        Type type = option.GetType();
+        if (AccessTools.Property(type, "Choices")?.GetValue(option) is not string[] choices)
+            return (name, tooltip, []);
+
+        if (!choiceFormatters.TryGetValue(option, out Func<string, string>? formatter))
+        {
+            var format = (Func<string, string>?)AccessTools.Property(type, "FormatChoice")!.GetValue(option);
+            formatter = CaptureChoiceFormatter(option, format);
+        }
+        return (name, tooltip, choices.Select(formatter).ToArray());
+    }
+
+    private IEnumerable<ExportText> ReadSources(string? requestedMod, IReadOnlySet<string>? selectedMods = null,
+        bool includeInternalMods = false, Action<string, Exception>? reportReadError = null)
     {
         foreach ((_, string modId, _, object page) in ReadPages())
         {
-            if (modId.Equals("SMAPI", StringComparison.OrdinalIgnoreCase)
+            if ((!includeInternalMods && !IsExportable(modId)) || (selectedMods is not null && !selectedMods.Contains(modId))
                 || (requestedMod is not null && !modId.Equals(requestedMod, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
             if (pageTitles.TryGetValue(page, out Func<string>? title))
-                yield return (modId, title() ?? "");
+            {
+                string? source;
+                try
+                {
+                    source = title();
+                }
+                catch (Exception error) when (reportReadError is not null)
+                {
+                    reportReadError(modId, error);
+                    source = null;
+                }
+                yield return new ExportText(modId, source ?? "");
+            }
 
             foreach (object option in ReadOptions(page))
             {
-                if (!options.TryGetValue(option, out OptionText? text))
-                    continue;
-
-                yield return (modId, text.Name?.Invoke() ?? "");
-                yield return (modId, text.Tooltip?.Invoke() ?? "");
-
-                if (choiceFormatters.TryGetValue(option, out Func<string, string>? formatter))
+                (string? Name, string? Tooltip, string[] Choices) text;
+                try
                 {
-                    var choices = (string[])AccessTools.Property(option.GetType(), "Choices")!.GetValue(option)!;
-                    foreach (string value in choices)
-                        yield return (modId, formatter(value));
+                    text = ReadOptionSources(option);
                 }
+                catch (Exception error) when (reportReadError is not null)
+                {
+                    reportReadError(modId, error);
+                    continue;
+                }
+                yield return new ExportText(modId, text.Name ?? "");
+                yield return new ExportText(modId, text.Tooltip ?? "");
+                foreach (string choice in text.Choices)
+                    yield return new ExportText(modId, choice);
             }
         }
     }
@@ -381,6 +697,8 @@ public sealed class ModEntry : Mod
     private void OnLocaleChanged(object? sender, LocaleChangedEventArgs e)
     {
         translations.SetLocale(e.NewLocale);
+        if (syncMenu?.TryGetCurrentMenu(out IManifest? manifest, out _) == true && manifest?.UniqueID == ModManifest.UniqueID)
+            RefreshManagement();
     }
 
     private void OnExportCommand(string command, string[] args)
@@ -396,7 +714,8 @@ public sealed class ModEntry : Mod
         try
         {
             translations.ClearCache();
-            int count = TemplateExporter.Export(translations, locale, ReadSources(modId));
+            int count = TemplateExporter.Export(translations, locale,
+                ReadSources(modId).Select(entry => (entry.ModId, entry.Source)));
             if (count == 0)
                 Monitor.Log(I18n.Get("command.export.none", new { locale }), LogLevel.Info);
             else

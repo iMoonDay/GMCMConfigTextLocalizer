@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
@@ -5,18 +6,18 @@ namespace GMCMConfigTextLocalizer;
 
 internal static class OverrideFile
 {
-    internal static readonly JsonSerializerOptions WriteOptions = new()
+    private static readonly JsonSerializerOptions WriteOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         WriteIndented = true
     };
 
-    public static Dictionary<string, string> Read(string path)
+    public static Dictionary<string, string?> Read(string path)
     {
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
         if (!File.Exists(path))
-            return values;
+            return new(StringComparer.Ordinal);
 
+        var values = new Dictionary<string, string?>(StringComparer.Ordinal);
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path), new JsonDocumentOptions
         {
             AllowTrailingCommas = true,
@@ -30,7 +31,7 @@ internal static class OverrideFile
         {
             if (property.Value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
                 throw new JsonException($"The translation for '{property.Name}' must be a string.");
-            if (!values.TryAdd(property.Name, property.Value.GetString() ?? ""))
+            if (!values.TryAdd(property.Name, property.Value.GetString()))
                 throw new JsonException($"Duplicate source text '{property.Name}'.");
         }
         return values;
@@ -41,5 +42,22 @@ internal static class OverrideFile
         string fileName = string.Concat(modId.Select(character =>
             Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
         return Path.Combine(modDirectory, "overrides", locale, $"{fileName}.json");
+    }
+
+    public static void WriteAtomically<T>(string path, T values, bool overwrite = true)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        string temporaryPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            string json = JsonSerializer.Serialize(values, WriteOptions);
+            File.WriteAllText(temporaryPath, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.Move(temporaryPath, path, overwrite);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
     }
 }

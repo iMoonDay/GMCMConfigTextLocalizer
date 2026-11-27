@@ -19,6 +19,8 @@
     <Reference Include="MonoGame.Framework" HintPath="$(GamePath)/MonoGame.Framework.dll" Private="false" />
     <Reference Include="xTile" HintPath="$(GamePath)/xTile.dll" Private="false" />
     <Reference Include="0Harmony" HintPath="$(GamePath)/smapi-internal/0Harmony.dll" Private="false" />
+    <Reference Include="Newtonsoft.Json" HintPath="$(GamePath)/smapi-internal/Newtonsoft.Json.dll" Private="false" />
+    <Reference Include="SMAPI.Toolkit" HintPath="$(GamePath)/smapi-internal/SMAPI.Toolkit.dll" Private="false" />
     <Reference Include="SMAPI.Toolkit.CoreInterfaces" HintPath="$(GamePath)/smapi-internal/SMAPI.Toolkit.CoreInterfaces.dll" Private="false" />
   </ItemGroup>
   <Target Name="CheckGamePath" BeforeTargets="ResolveReferences">

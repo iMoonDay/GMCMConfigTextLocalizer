@@ -2,7 +2,7 @@
   "Name": "GMCM 配置文本本地化（GMCM Config Text Localizer）",
   "Author": "iMoonDay",
   "Version": "1.1.1",
-  "Description": "替换 GMCM 设置界面中的文字，支持本地译文和 GitHub 社区翻译包。",
+  "Description": "用本地译文替换 GMCM 设置界面中的文字，并从 GitHub 补充缺少的译文。",
   "UniqueID": "iMoonDay.GMCMConfigTextLocalizer",
   "EntryDll": "GMCMConfigTextLocalizer.dll",
   "MinimumApiVersion": "4.1.0",
