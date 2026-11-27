@@ -3,4 +3,4 @@ obj/
 dist/
 community-packs.zip
 community-packs.*.tmp
-overrides/
+/overrides/.ignored/

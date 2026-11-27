@@ -14,10 +14,10 @@ def read_translations(pairs):
 
 paths = set()
 expanded_size = 0
-for path in sorted(Path("packs").rglob("*")):
+for path in sorted(Path("overrides").rglob("*")):
     if not path.is_file():
         continue
-    relative = path.relative_to("packs").as_posix()
+    relative = path.relative_to("overrides").as_posix()
     if not re.fullmatch(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.json", relative):
         raise SystemExit(f"Invalid pack path: {path}")
     if relative.lower() in paths:

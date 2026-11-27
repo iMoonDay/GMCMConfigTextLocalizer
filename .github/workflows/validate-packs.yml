@@ -31,7 +31,7 @@ jobs:
       - name: Publish packs with their version file
         run: |
           python3 .github/validate-packs.py
-          version=$(git rev-parse HEAD:packs)
+          version=$(git rev-parse HEAD:overrides)
           export GIT_INDEX_FILE="$RUNNER_TEMP/community-packs.index"
           git read-tree "$version"
           version_blob=$(printf '%s\n' "$version" | git hash-object -w --stdin)
